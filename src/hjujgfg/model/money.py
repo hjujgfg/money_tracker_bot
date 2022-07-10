@@ -1,5 +1,6 @@
 import uuid
 from typing import List, Dict
+import time
 from uuid import UUID
 
 
@@ -72,6 +73,9 @@ class MoneyCapsule:
     def spend(self, amount: float):
         self.amount -= amount
 
+    def add(self, amount: float):
+        self.amount += amount
+
     @staticmethod
     def from_json_dict(json_dict):
         return MoneyCapsule(
@@ -82,3 +86,14 @@ class MoneyCapsule:
 
     def __str__(self):
         return f'{self.name}: {self.amount} {str(self.currency)}'
+
+
+class Transaction:
+
+    def __init__(self, capsule: MoneyCapsule, amount: float):
+        self.capsule = capsule
+        self.amount = amount
+        self.timestamp = time.time()
+
+    def __str__(self):
+        return f'{self.timestamp}: {self.amount}. Capsule state after: {self.capsule}'

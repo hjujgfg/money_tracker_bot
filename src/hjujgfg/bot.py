@@ -2,7 +2,7 @@ import telebot as tbot
 from telebot.types import Message
 import hjujgfg.secrets_getter as secret
 from hjujgfg.constants import START_COMMAND, CREATE_WALLET_COMMAND, ADD_CURRENCY_COMMAND, ADD_CAPSULE_COMMAND, \
-    SHOW_WALLET_COMMAND, SPEND
+    SHOW_WALLET_COMMAND, SPEND, ADD, SHOW_TRANSACTIONS_COMMAND
 from hjujgfg.database.database import WalletDataAccessorInterface, FileWalletDataAccessor
 from hjujgfg.state.state_machine import StateMachine
 
@@ -11,8 +11,6 @@ bot = tbot.TeleBot(token)
 machine = StateMachine(bot)
 
 data_accessor: WalletDataAccessorInterface = FileWalletDataAccessor()
-
-
 
 
 def _chid(message: Message) -> int:
@@ -24,7 +22,9 @@ def extract_command(arg):
 
 
 @bot.message_handler(commands=[
-    START_COMMAND, CREATE_WALLET_COMMAND, ADD_CURRENCY_COMMAND, ADD_CAPSULE_COMMAND, SHOW_WALLET_COMMAND, SPEND])
+    START_COMMAND, CREATE_WALLET_COMMAND, ADD_CURRENCY_COMMAND, ADD_CAPSULE_COMMAND, SHOW_WALLET_COMMAND, SPEND,
+    ADD, SHOW_TRANSACTIONS_COMMAND
+])
 def start_command(message: Message):
     # state_machine.process_command(chat_id, '')
     machine.process_command(extract_command(message.text), message)

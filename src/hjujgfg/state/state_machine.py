@@ -5,11 +5,11 @@ import telebot as tbot
 
 from hjujgfg.exceptions.exceptions import LogicalError
 from hjujgfg.constants import START_COMMAND, ADD_CURRENCY_COMMAND, CREATE_WALLET_COMMAND, \
-    IDK_VARIATIONS, ADD_CAPSULE_COMMAND, SHOW_WALLET_COMMAND, SPEND
+    IDK_VARIATIONS, ADD_CAPSULE_COMMAND, SHOW_WALLET_COMMAND, SPEND, ADD, SHOW_TRANSACTIONS_COMMAND
 from hjujgfg.database.database import FileWalletDataAccessor, WalletDataAccessorInterface
 from hjujgfg.state import StateInterface
 from hjujgfg.state.states import StartState, AddCurrencyState, NoSuchCommandState, CreateWalletState, AddCapsuleState, \
-    ShowWalletInfo, SpendMoney1
+    ShowWalletInfo, ChangeBalance, ShowTransactions
 
 
 class StateMachine:
@@ -23,7 +23,9 @@ class StateMachine:
             SHOW_WALLET_COMMAND: ShowWalletInfo(),
             ADD_CURRENCY_COMMAND: AddCurrencyState(),
             ADD_CAPSULE_COMMAND: AddCapsuleState(),
-            SPEND: SpendMoney1()
+            SPEND: ChangeBalance(True),
+            ADD: ChangeBalance(False),
+            SHOW_TRANSACTIONS_COMMAND: ShowTransactions()
         }
 
         self.db: WalletDataAccessorInterface = FileWalletDataAccessor()

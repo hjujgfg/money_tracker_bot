@@ -2,9 +2,10 @@ import os
 import pickle
 from enum import Enum
 from os.path import exists
+from typing import List
 
 from hjujgfg.exceptions.exceptions import NoWalletException
-from hjujgfg.model.money import Wallet, MoneyCapsule
+from hjujgfg.model.money import Wallet, MoneyCapsule, Transaction
 
 
 class State(Enum):
@@ -37,6 +38,12 @@ class WalletDataAccessorInterface:
     def drop_state(self, chat_id: int):
         pass
 
+    def save_transactions(self, chat_id: int, transactions: List[Transaction]):
+        pass
+
+    def get_transactions(self, chat_id: int) -> List[Transaction]:
+        pass
+
 
 class FileWalletDataAccessor(WalletDataAccessorInterface):
 
@@ -47,6 +54,10 @@ class FileWalletDataAccessor(WalletDataAccessorInterface):
     @staticmethod
     def _get_chat_state_file(chat_id: int):
         return f'data/states/{chat_id}.json'
+
+    @staticmethod
+    def _get_transactions_file(chat_id: int):
+        return f'data/transactions/{chat_id}.m'
 
     def check_wallet_exists(self, chat_id: int):
         wallet_file_path = FileWalletDataAccessor._get_chat_wallet_file(chat_id)
@@ -86,3 +97,14 @@ class FileWalletDataAccessor(WalletDataAccessorInterface):
     def drop_state(self, chat_id: int):
         if self.check_state_exists(chat_id):
             os.remove(self._get_chat_state_file(chat_id))
+
+    def save_transactions(self, chat_id: int, transactions: List[Transaction]):
+        with open(self._get_transactions_file(chat_id), 'wb') as f:
+            pickle.dump(transactions, f)
+
+    def get_transactions(self, chat_id: int) -> List[Transaction]:
+        transactions_file_path = FileWalletDataAccessor._get_transactions_file(chat_id)
+        if not exists(transactions_file_path):
+            return []
+        with open(self._get_transactions_file(chat_id), 'rb') as f:
+            return pickle.load(f)

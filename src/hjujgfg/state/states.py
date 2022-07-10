@@ -4,7 +4,7 @@ import telebot as tlbt
 import telebot.types as types
 
 from hjujgfg.exceptions.exceptions import NoSuchCurrencyException, NoCapsulesException, NoSuchCapsuleExcpetion
-from hjujgfg.model.money import Wallet
+from hjujgfg.model.money import Wallet, Transaction
 from hjujgfg.state import StateInterface
 
 
@@ -38,7 +38,7 @@ class CreateWalletState(StateInterface):
             wallet = Wallet(chat_id)
             self.db.save_wallet(chat_id, wallet)
             return (f'Yo, wallet has been created, now you can add currencies you are planning to work with'
-                    'To do that send me a command `/add_currency <currency_name>`, for example: `/add_currency USD`')
+                    'To do that send me a command /add\_currency')
 
 
 class ShowWalletInfo(StateInterface):
@@ -46,21 +46,22 @@ class ShowWalletInfo(StateInterface):
     def process(self, message: tlbt.types.Message) -> (str, Optional[tlbt.types.ReplyKeyboardMarkup]):
         chat_id = self._chid(message)
         if not self.db.check_wallet_exists(chat_id):
-            return f'Yo, you don\'t have a wallet yet, please create a wallet first.'
+            return f'Yo, you don\'t have a wallet yet, please create a wallet first with /create\_wallet.'
         wallet = self.db.get_wallet(chat_id)
         currencies = ', '.join(
             list(map(lambda c: str(c), wallet.known_currencies))
         )
 
-        capsules = ',\n'.join(
+        capsules = '\n=============\n'.join(
             list(map(lambda c: str(c), wallet.capsules.values()))
         )
-
         return (f'You have following currencies:\n'
                 f'*{currencies}*\n'
                 f'and the **following**'
                 f' capsules:\n'
-                f'```{capsules}``` \n')
+                f'```\n'
+                f'{capsules} '
+                f'``` \n')
 
 
 class AddCurrencyState(StateInterface):
@@ -82,14 +83,14 @@ class AddCurrencyState1(StateInterface):
     def process(self, message: tlbt.types.Message) -> str:
         chat_id = self._chid(message)
         if not self.db.check_wallet_exists(chat_id):
-            return 'Yo, you don\'t have a wallet yet, please run `/create_wallet` command'
+            return 'Yo, you don\'t have a wallet yet, please run /create\_wallet command'
         wallet = self.db.get_wallet(chat_id)
         currency_name = message.text.strip().upper()
         wallet.add_currency(currency_name)
         self.db.save_wallet(chat_id, wallet)
         return (f'Yo, I\'ve added a currency {currency_name} to your wallet!,'
                 f' now you can create a money capsule with this currency, just send me: '
-                f'`/add_capsule`.'
+                f'/add\_capsule. \n'
                 f'Or you could add another currency if you want to')
 
     def next_state(self):
@@ -125,7 +126,7 @@ class AddCapsuleState1(StateInterface):
         keyboard.add(*buttons)
         self.markup = keyboard
 
-        return f'Great, this capsule will be known as {message.text}, now you need to select currency for it.'
+        return f'Great, this capsule will be known as `{message.text}`, now you need to select currency for it.'
 
     def next_state(self):
         next_state = AddCapsuleState2()
@@ -138,19 +139,19 @@ class AddCapsuleState2(StateInterface):
     def process(self, message: tlbt.types.Message) -> (str, Optional[tlbt.types.ReplyKeyboardMarkup]):
         chat_id = self._chid(message)
         if not self.db.check_wallet_exists(chat_id):
-            return 'Yo, you don\'t have a wallet yet, please run /create_wallet command'
+            return 'Yo, you don\'t have a wallet yet, please run /create\_wallet command'
 
         wallet = self.db.get_wallet(chat_id)
         selected = message.text.strip().upper()
         found = wallet.known_currencies.get(selected, None)
         if not found:
             raise NoSuchCurrencyException(
-                f'There is no such currency as {selected} in your wallet, please add it with /add_currency'
+                f'There is no such currency as `{selected}` in your wallet, please add it with /add\_currency'
             )
         else:
             name = self.additional_info['name']
             self.additional_info['currency'] = found
-            return (f'Okay, we have capsule {name} in {selected} currency.'
+            return (f'Okay, we have capsule `{name}` in `{selected}` currency.\n'
                     f' Now send me the amount that you have for this capsule.')
 
     def next_state(self):
@@ -180,7 +181,11 @@ class AddCapsuleState3(StateInterface):
             return 'Yo, you\'ve enterred something I could not parse. Please enter valid floating point number'
 
 
-class SpendMoney1(StateInterface):
+class ChangeBalance(StateInterface):
+
+    def __init__(self, is_decrease: bool):
+        super().__init__()
+        self.additional_info['is_decrease'] = is_decrease
 
     def process(self, message: tlbt.types.Message) -> (str, Optional[tlbt.types.ReplyKeyboardMarkup]):
         chat_id = self._chid(message)
@@ -197,13 +202,15 @@ class SpendMoney1(StateInterface):
         keyboard.add(*buttons)
         self.markup = keyboard
 
-        return f'Select capsule you\'ve to spend from'
+        return f'Select a capsule to change balance of'
 
     def next_state(self):
-        return SpendMoney2()
+        nxt = ChangeBalance2()
+        nxt.additional_info['is_decrease'] = self.additional_info['is_decrease']
+        return nxt
 
 
-class SpendMoney2(StateInterface):
+class ChangeBalance2(StateInterface):
     def process(self, message: tlbt.types.Message) -> (str, Optional[tlbt.types.ReplyKeyboardMarkup]):
         chat_id = self._chid(message)
         if not self.db.check_wallet_exists(chat_id):
@@ -214,15 +221,17 @@ class SpendMoney2(StateInterface):
         if selected not in wallet.capsules:
             raise NoSuchCapsuleExcpetion('There is no such capsule')
         self.additional_info['selected_capsule'] = selected
-        return f'Okay, in f{selected} you have {wallet.capsules[selected].amount}, send me the amount to decrease now'
+        return (f'Okay, in `{selected}` you have `{wallet.capsules[selected].amount}`,'
+                f'send me the amount of a transaction.')
 
     def next_state(self):
-        next = SpendMoney3()
+        next = ChangeBalance3()
         next.additional_info['selected_capsule'] = self.additional_info['selected_capsule']
+        next.additional_info['is_decrease'] = self.additional_info['is_decrease']
         return next
 
 
-class SpendMoney3(StateInterface):
+class ChangeBalance3(StateInterface):
     def process(self, message: tlbt.types.Message) -> (str, Optional[tlbt.types.ReplyKeyboardMarkup]):
         chat_id = self._chid(message)
         if not self.db.check_wallet_exists(chat_id):
@@ -230,13 +239,38 @@ class SpendMoney3(StateInterface):
         wallet = self.db.get_wallet(chat_id)
         amount = float(message.text.strip())
         capsule = wallet.capsules[self.additional_info['selected_capsule']]
-        capsule.spend(amount)
+        transactions = self.db.get_transactions(chat_id)
 
-        if capsule.amount < 0.:
-            return f'Decreased the amount, current: {capsule.amount}, NOTE: it\'s below zero!'
+        if self.additional_info['is_decrease']:
+            capsule.spend(amount)
+            transactions.append(Transaction(capsule, -amount))
         else:
-            return f'Decreased the amount, current: {capsule.amount}'
+            capsule.add(amount)
+            transactions.append(Transaction(capsule, amount))
+
+        self.db.save_wallet(chat_id, wallet)
+
+        self.db.save_transactions(chat_id, transactions)
+        if capsule.amount < 0.:
+            return f'Done! Current amount: `{capsule.amount}`, *NOTE: it\'s below zero!*'
+        else:
+            return f'Done! Current amount: `{capsule.amount}`'
 
     def next_state(self):
         return None
 
+
+class ShowTransactions(StateInterface):
+
+    def process(self, message: tlbt.types.Message) -> (str, Optional[tlbt.types.ReplyKeyboardMarkup]):
+        chat_id = self._chid(message)
+        if not self.db.check_wallet_exists(chat_id):
+            return 'Yo, you don\'t have a wallet yet, please run /create_wallet command'
+        transactions = self.db.get_transactions(chat_id)
+        parsed = '\n----------==============----------\n'\
+            .join(list(map(lambda t: str(t), transactions)))
+
+        return (f'Here is a list of your transactins:\n'
+                f'``` \n'
+                f'{parsed}'
+                f'```')
