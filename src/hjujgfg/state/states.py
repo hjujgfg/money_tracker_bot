@@ -102,10 +102,10 @@ class AddCapsuleState(StateInterface):
     def process(self, message: tlbt.types.Message) -> str:
         chat_id = self._chid(message)
         if not self.db.check_wallet_exists(chat_id):
-            return 'Yo, you don\'t have a wallet yet, please run /create_wallet command'
+            return 'Yo, you don\'t have a wallet yet, please run /create\_wallet command'
         wallet = self.db.get_wallet(chat_id)
         if len(wallet.known_currencies) == 0:
-            return 'Yo, you don\'t have any currencies for your wallet, please run /add_currency command'
+            return 'Yo, you don\'t have any currencies for your wallet, please run /add\_currency command'
         else:
             return 'Cool, then enter a name for the new capsule, it\'s for you to distinguish them, should be unique.'
 
